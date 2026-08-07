@@ -13,6 +13,13 @@ This repository has four immediate goals:
 
 **No new nonsoficity theorem is currently claimed by this repository.**
 
+## Start here
+
+- [`STATUS.md`](STATUS.md) — exact current claim boundary and pending gates.
+- [`ROADMAP.md`](ROADMAP.md) — staged research plan from reproduction to external review.
+- [`docs/CLAIM_STATUS.md`](docs/CLAIM_STATUS.md) — vocabulary separating established results, reproduction, computation, proposals, and open claims.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — how to submit reproductions, corrections, counterexamples, or formal work.
+
 ## Current research tracks
 
 - `01-kernel-reproduction/` — pinned clean-room reproduction protocol for the OpenAI Lean certificate.
@@ -41,7 +48,7 @@ The first audit is pinned to:
 - Lean: `v4.32.0`
 - target theorem: `SoficGroups.SourceTopLevelCompressionFinal.exists_finitelyPresented_nonsofic_group`
 
-See [`01-kernel-reproduction/REPRODUCTION_PROTOCOL.md`](01-kernel-reproduction/REPRODUCTION_PROTOCOL.md).
+See [`01-kernel-reproduction/REPRODUCTION_PROTOCOL.md`](01-kernel-reproduction/REPRODUCTION_PROTOCOL.md). A manual two-job GitHub Actions workflow is included at `.github/workflows/kernel-reproduction.yml`; it keeps the ordinary Lean build separate from the fresh Comparator/nanoda job.
 
 ## Primary external sources
 
