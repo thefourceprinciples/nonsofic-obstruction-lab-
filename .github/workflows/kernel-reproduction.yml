@@ -1,0 +1,212 @@
+name: Nonsofic kernel reproduction
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ordinary-lean-build:
+    name: Ordinary Lean build and axiom query
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Checkout audit repository
+        uses: actions/checkout@v4
+
+      - name: Checkout pinned OpenAI formalization
+        uses: actions/checkout@v4
+        with:
+          repository: openai/ten-proofs
+          ref: 94bc0feb6a9ff12c7d31d6de640a725c9d43d2b6
+          path: ten-proofs
+
+      - name: Install elan
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Record environment and source identity
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p evidence/ordinary
+          uname -a | tee evidence/ordinary/uname.txt
+          git -C ten-proofs rev-parse HEAD | tee evidence/ordinary/source-commit.txt
+          git -C ten-proofs status --porcelain=v1 | tee evidence/ordinary/git-status.txt
+          sha256sum \
+            ten-proofs/NonSoficGroup.lean \
+            ten-proofs/ComparatorChallenges/D_NonSoficGroup.lean \
+            ten-proofs/ComparatorChallenges/D_NonSoficGroup.json \
+            ten-proofs/lean-toolchain \
+            ten-proofs/lake-manifest.json \
+            | tee evidence/ordinary/source-sha256.txt
+
+      - name: Fetch pinned mathlib cache
+        working-directory: ten-proofs
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake exe cache get
+
+      - name: Build NonSoficGroup
+        working-directory: ten-proofs
+        shell: bash
+        run: |
+          set -o pipefail
+          lean --version 2>&1 | tee ../evidence/ordinary/lean-version.txt
+          lake --version 2>&1 | tee ../evidence/ordinary/lake-version.txt
+          lake build NonSoficGroup 2>&1 | tee ../evidence/ordinary/build.log
+
+      - name: Print target theorem and axioms
+        working-directory: ten-proofs
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cat > KernelAuditQuery.lean <<'EOF'
+          import NonSoficGroup
+          #print SoficGroups.SourceTopLevelCompressionFinal.exists_finitelyPresented_nonsofic_group
+          #print axioms SoficGroups.SourceTopLevelCompressionFinal.exists_finitelyPresented_nonsofic_group
+          EOF
+          set -o pipefail
+          lake env lean KernelAuditQuery.lean 2>&1 | tee ../evidence/ordinary/theorem-and-axioms.log
+          rm KernelAuditQuery.lean
+
+      - name: Upload ordinary-build evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: ordinary-lean-evidence
+          path: evidence/ordinary
+          if-no-files-found: error
+
+  comparator-clean-room:
+    name: Fresh Comparator and nanoda check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - name: Checkout audit repository
+        uses: actions/checkout@v4
+
+      - name: Checkout pinned OpenAI formalization
+        uses: actions/checkout@v4
+        with:
+          repository: openai/ten-proofs
+          ref: 94bc0feb6a9ff12c7d31d6de640a725c9d43d2b6
+          path: ten-proofs
+
+      - name: Install elan
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Install Go 1.24
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
+      - name: Build pinned landrun
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p "$HOME/audit-bin" evidence/comparator
+          git clone https://github.com/Zouuup/landrun.git landrun-src
+          git -C landrun-src checkout 811cfff51ceaf3d9843708aa6d22e9b84ccac8b4
+          (cd landrun-src && go build -o "$HOME/audit-bin/landrun" cmd/landrun/main.go)
+          "$HOME/audit-bin/landrun" --help > evidence/comparator/landrun-help.txt 2>&1 || true
+          git -C landrun-src rev-parse HEAD | tee evidence/comparator/landrun-commit.txt
+
+      - name: Build pinned nanoda
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git clone https://github.com/ammkrn/nanoda_lib.git nanoda-src
+          git -C nanoda-src checkout 418320295890faed83a96fd97907b12a3b6728c2
+          (cd nanoda-src && cargo build --release --bin nanoda_bin)
+          cp nanoda-src/target/release/nanoda_bin "$HOME/audit-bin/nanoda_bin"
+          git -C nanoda-src rev-parse HEAD | tee evidence/comparator/nanoda-commit.txt
+          "$HOME/audit-bin/nanoda_bin" --help > evidence/comparator/nanoda-help.txt 2>&1 || true
+
+      - name: Record clean-room source identity
+        shell: bash
+        run: |
+          set -euxo pipefail
+          uname -a | tee evidence/comparator/uname.txt
+          git -C ten-proofs rev-parse HEAD | tee evidence/comparator/source-commit.txt
+          git -C ten-proofs status --porcelain=v1 | tee evidence/comparator/git-status-before.txt
+          sha256sum \
+            ten-proofs/NonSoficGroup.lean \
+            ten-proofs/ComparatorChallenges/D_NonSoficGroup.lean \
+            ten-proofs/ComparatorChallenges/D_NonSoficGroup.json \
+            ten-proofs/lean-toolchain \
+            ten-proofs/lake-manifest.json \
+            | tee evidence/comparator/source-sha256.txt
+
+      - name: Fetch trusted cache without prebuilding solution
+        working-directory: ten-proofs
+        shell: bash
+        run: |
+          set -euxo pipefail
+          lake exe cache get
+
+      - name: Verify dependency pins and build lean4export
+        working-directory: ten-proofs
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test "$(git -C .lake/packages/Comparator rev-parse HEAD)" = "07bc4ea40f2266dcb861820a2ec1fa3244ed307f"
+          test "$(git -C .lake/packages/lean4export rev-parse HEAD)" = "4e7915201d3f9f04470d9eae002fa695f7cdc589"
+          git -C .lake/packages/Comparator rev-parse HEAD | tee ../evidence/comparator/comparator-commit.txt
+          git -C .lake/packages/lean4export rev-parse HEAD | tee ../evidence/comparator/lean4export-commit.txt
+          (cd .lake/packages/lean4export && lake build)
+
+      - name: Run Comparator with nanoda enabled
+        working-directory: ten-proofs
+        shell: bash
+        env:
+          COMPARATOR_LANDRUN: ${{ github.workspace }}/../_temp_placeholder
+        run: |
+          set -euxo pipefail
+          export COMPARATOR_LANDRUN="$HOME/audit-bin/landrun"
+          export COMPARATOR_NANODA="$HOME/audit-bin/nanoda_bin"
+          export COMPARATOR_LEAN4EXPORT="$PWD/.lake/packages/lean4export/.lake/build/bin/lean4export"
+          export PATH="$HOME/audit-bin:$PATH"
+          lean --version 2>&1 | tee ../evidence/comparator/lean-version.txt
+          lake --version 2>&1 | tee ../evidence/comparator/lake-version.txt
+
+          if systemd-run --user --wait --quiet true >/dev/null 2>&1; then
+            echo "systemd-user-wrapper=available" | tee ../evidence/comparator/sandbox-hardening.txt
+            set -o pipefail
+            systemd-run \
+              --property=RestrictAddressFamilies=~AF_UNIX \
+              --user --wait --pipe \
+              -E PATH="$PATH" \
+              -E COMPARATOR_LANDRUN="$COMPARATOR_LANDRUN" \
+              -E COMPARATOR_NANODA="$COMPARATOR_NANODA" \
+              -E COMPARATOR_LEAN4EXPORT="$COMPARATOR_LEAN4EXPORT" \
+              --working-directory "$(pwd)" \
+              -- bash -lc 'lake exe comparator ComparatorChallenges/D_NonSoficGroup.json' \
+              2>&1 | tee ../evidence/comparator/comparator.log
+          else
+            echo "systemd-user-wrapper=unavailable; Comparator run retained as a documented deviation" | tee ../evidence/comparator/sandbox-hardening.txt
+            set -o pipefail
+            lake exe comparator ComparatorChallenges/D_NonSoficGroup.json 2>&1 | tee ../evidence/comparator/comparator.log
+          fi
+
+      - name: Record post-run tree status
+        if: always()
+        shell: bash
+        run: |
+          git -C ten-proofs status --porcelain=v1 | tee evidence/comparator/git-status-after.txt
+
+      - name: Upload Comparator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: comparator-nanoda-evidence
+          path: evidence/comparator
+          if-no-files-found: error
