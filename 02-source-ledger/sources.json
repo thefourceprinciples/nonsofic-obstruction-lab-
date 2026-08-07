@@ -1,0 +1,36 @@
+{
+  "schema_version": "0.1",
+  "updated": "2026-08-07",
+  "sources": [
+    {
+      "id": "openai-ten-proofs-nonsofic",
+      "type": "formalization-and-paper",
+      "title": "Ten Advances in Mathematics and Theoretical Computer Science — Chapter 3: Nonsofic groups exist",
+      "repository": "https://github.com/openai/ten-proofs",
+      "repository_commit": "94bc0feb6a9ff12c7d31d6de640a725c9d43d2b6",
+      "target_theorem": "SoficGroups.SourceTopLevelCompressionFinal.exists_finitelyPresented_nonsofic_group",
+      "role": ["primary-construction", "formal-certificate", "proposition-2.3-source"],
+      "lab_status": ["ESTABLISHED", "SOURCE-PINNED"]
+    },
+    {
+      "id": "fournier-facio-2608.02025",
+      "type": "paper",
+      "title": "A torsion-free non-sofic group",
+      "authors": ["Francesco Fournier-Facio"],
+      "url": "https://arxiv.org/abs/2608.02025",
+      "initial_submission": "2026-08-03",
+      "role": ["independent-reuse", "feature-ablation", "torsion-free-construction"],
+      "lab_status": ["ESTABLISHED", "INDEPENDENTLY-REUSED"]
+    },
+    {
+      "id": "kun-thom-2608.06222",
+      "type": "paper",
+      "title": "Nonsofic wreath products of residually finite groups",
+      "authors": ["Gábor Kun", "Andreas Thom"],
+      "url": "https://arxiv.org/abs/2608.06222",
+      "initial_submission": "2026-08-06",
+      "role": ["independent-reuse", "mechanism-extension", "wreath-products"],
+      "lab_status": ["ESTABLISHED", "INDEPENDENTLY-REUSED"]
+    }
+  ]
+}
