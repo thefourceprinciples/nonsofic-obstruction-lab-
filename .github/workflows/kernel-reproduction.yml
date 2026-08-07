@@ -167,8 +167,6 @@ jobs:
       - name: Run Comparator with nanoda enabled
         working-directory: ten-proofs
         shell: bash
-        env:
-          COMPARATOR_LANDRUN: ${{ github.workspace }}/../_temp_placeholder
         run: |
           set -euxo pipefail
           export COMPARATOR_LANDRUN="$HOME/audit-bin/landrun"
