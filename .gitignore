@@ -1,0 +1,25 @@
+# Lean / Lake
+.lake/
+*.olean
+*.ilean
+
+# Local evidence bundles and generated logs
+evidence/
+*.log
+
+# Python / notebooks
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# Solver/build outputs
+target/
+build/
+dist/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
